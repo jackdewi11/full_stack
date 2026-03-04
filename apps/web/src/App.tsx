@@ -77,6 +77,10 @@ export default function App() {
   const [createLoading, setCreateLoading] = useState(false);
 
   const [registeringClassId, setRegisteringClassId] = useState<string | null>(null);
+  const [showGroqModal, setShowGroqModal] = useState(false);
+  const [groqQuery, setGroqQuery] = useState("");
+  const [groqLoading, setGroqLoading] = useState(false);
+  const [groqResult, setGroqResult] = useState<string | null>(null);
 
   const dashboardTitle = useMemo(() => {
     if (!currentRole) {
@@ -300,12 +304,56 @@ export default function App() {
     setStatus("Logged out.");
   }
 
+  async function handleSubmitGroq() {
+    if (!accessToken || currentRole !== "member") {
+      setStatus("Only members can ask GROQ questions. Log in as a member.");
+      return;
+    }
+
+    setGroqLoading(true);
+    setGroqResult(null);
+
+    try {
+      const response = await fetch(apiUrl("/api/groq-query"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({ query: groqQuery })
+      });
+
+      const data = await parseApiJson<any>(response);
+      if (!response.ok) {
+        setGroqResult((data && (data.error || data.message)) || `API error: ${response.status}`);
+        return;
+      }
+
+      setGroqResult(JSON.stringify(data, null, 2));
+    } catch (err) {
+      if (err instanceof Error) {
+        setGroqResult(err.message);
+      } else {
+        setGroqResult("Unknown error");
+      }
+    } finally {
+      setGroqLoading(false);
+    }
+  }
+
   return (
     <main className="page">
       <section className="panel">
         <header className="panel-header">
           <div>
-            <h1>{dashboardTitle}</h1>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <h1>{dashboardTitle}</h1>
+              {currentRole === "member" && (
+                <button type="button" className="ghost" onClick={() => setShowGroqModal(true)}>
+                  Ask GROQ
+                </button>
+              )}
+            </div>
             <p>Local programs for neighbors, families, and lifelong learners.</p>
           </div>
           {accessToken && (
@@ -489,6 +537,41 @@ export default function App() {
         )}
 
         {status && <p className="status">{status}</p>}
+        {showGroqModal && (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "rgba(0,0,0,0.3)",
+              zIndex: 2000
+            }}
+          >
+            <div style={{ background: "white", padding: 16, borderRadius: 8, width: "90%", maxWidth: 720 }}>
+              <h3>Ask GROQ</h3>
+              <textarea
+                value={groqQuery}
+                onChange={(e) => setGroqQuery(e.target.value)}
+                rows={8}
+                style={{ width: "100%" }}
+                placeholder="Enter your GROQ query here"
+              />
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
+                <button type="button" onClick={() => setShowGroqModal(false)}>
+                  Cancel
+                </button>
+                <button type="button" onClick={handleSubmitGroq} disabled={groqLoading}>
+                  {groqLoading ? "Sending..." : "Send"}
+                </button>
+              </div>
+              {groqResult && (
+                <pre style={{ marginTop: 12, maxHeight: 220, overflow: "auto" }}>{groqResult}</pre>
+              )}
+            </div>
+          </div>
+        )}
       </section>
     </main>
   );

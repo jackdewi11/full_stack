@@ -9,6 +9,19 @@ exception
   when duplicate_object then null;
 end $$;
 
+-- Function to safely insert or update a user role from server-side code.
+-- This function is defined WITH SECURITY DEFINER so server code using
+-- the service role can call it without being blocked by row-level security.
+create or replace function public.insert_user_role(p_id uuid, p_role public.user_role)
+returns void as $$
+begin
+  insert into public.users (id, role)
+  values (p_id, p_role)
+  on conflict (id) do update set role = excluded.role;
+end;
+$$ language plpgsql security definer;
+
+
 create table if not exists public.users (
   id uuid primary key references auth.users(id) on delete cascade,
   role public.user_role not null,

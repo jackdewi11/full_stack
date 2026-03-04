@@ -151,3 +151,16 @@ Redeploy after setting env vars. Do not add a trailing slash.
 1. Open `https://YOUR-RENDER-API.onrender.com/health` and confirm `{"status":"ok"}`.
 2. Open your Vercel URL and test signup/login.
 3. If browser shows CORS errors, verify `CORS_ORIGINS` exactly matches your Vercel domain.
+
+## 9. GROQ integration (optional)
+
+This project includes a simple backend proxy endpoint at `/api/groq-query` that allows authenticated `member` users to send a GROQ query from the web UI. To enable it, configure the following environment variables for the backend service (local `apps/api/.env` and production in Render):
+
+- `GROQ_API_KEY`: Your GROQ provider API key (required).
+- `GROQ_API_URL`: Optional provider URL (defaults to `https://api.groq.ai/v1/query`).
+
+Notes:
+- The web UI will show an "Ask GROQ" button for logged-in members only. That button opens a modal where members can submit a GROQ query.
+- The backend forwards the query to the configured GROQ endpoint and returns the provider response. Keep your `GROQ_API_KEY` secret and do not expose it in client-side code.
+
+After adding `GROQ_API_KEY` to your backend environment, redeploy the API and members will be able to ask questions via the UI.

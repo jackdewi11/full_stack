@@ -35,6 +35,8 @@ if (!supabaseUrl || !supabasePublishableKey || !supabaseServiceRoleKey) {
   );
 }
 
+// Supabase configuration is loaded from environment variables above.
+
 const authClient = createClient(supabaseUrl, supabasePublishableKey);
 const dbClient = createClient(supabaseUrl, supabaseServiceRoleKey);
 
@@ -47,7 +49,6 @@ app.use(
         callback(null, true);
         return;
       }
-
       callback(new Error(`Origin ${origin} not allowed by CORS`));
     }
   })
@@ -77,6 +78,10 @@ const createClassSchema = z.object({
 
 const registerSchema = z.object({
   classId: z.string().uuid()
+});
+
+const groqSchema = z.object({
+  query: z.string().min(1)
 });
 
 const classInsertSchema = z
@@ -134,6 +139,7 @@ async function fetchUserRole(userId: string): Promise<UserRole | null> {
   return data.role;
 }
 
+
 async function requireUser(
   request: Request,
   response: Response,
@@ -171,11 +177,20 @@ async function requireUser(
 }
 
 async function upsertUserRole(userId: string, role: UserRole) {
-  const { error } = await dbClient
-    .from("users")
-    .upsert({ id: userId, role }, { onConflict: "id" });
+  try {
+    const { data, error } = await dbClient.rpc("insert_user_role", { p_id: userId, p_role: role });
 
-  return error;
+    if (error) {
+      console.error("upsertUserRole rpc failed", { userId, role, message: error.message, details: error });
+      return error;
+    }
+
+    return null;
+  } catch (err) {
+    console.error("upsertUserRole rpc exception", { userId, role, err });
+    if (err instanceof Error) return err as any;
+    return { message: "Unknown RPC error" } as any;
+  }
 }
 
 app.get("/health", (_request: Request, response: Response) => {
@@ -447,6 +462,61 @@ app.post("/api/member/registrations", async (request: Request, response: Respons
   }
 
   response.status(201).json({ message: "Registration successful." } satisfies AuthResponse);
+});
+
+app.post("/api/groq-query", async (request: Request, response: Response) => {
+  const user = await requireUser(request, response, ["member"]);
+  if (!user) {
+    return;
+  }
+
+  const parsed = groqSchema.safeParse(request.body);
+  if (!parsed.success) {
+    response.status(400).json({ error: "Invalid GROQ payload" });
+    return;
+  }
+
+  const groqApiKey = process.env.GROQ_API_KEY;
+  const groqApiUrl = process.env.GROQ_API_URL ?? "https://api.groq.ai/v1/query";
+
+  if (!groqApiKey) {
+    response.status(500).json({ error: "GROQ_API_KEY not configured on the server." });
+    return;
+  }
+
+  try {
+    const fetchImpl = (globalThis as any).fetch ?? (() => { throw new Error('fetch not available'); });
+
+    const groqResponse = await fetchImpl(groqApiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${groqApiKey}`
+      },
+      body: JSON.stringify({ query: parsed.data.query })
+    });
+
+    const contentType = groqResponse.headers.get("content-type") ?? "";
+    let body: any;
+    if (contentType.includes("application/json")) {
+      body = await groqResponse.json();
+    } else {
+      body = await groqResponse.text();
+    }
+
+    if (!groqResponse.ok) {
+      response.status(502).json({ error: "GROQ provider error", details: body });
+      return;
+    }
+
+    response.json({ result: body });
+  } catch (err) {
+    if (err instanceof Error) {
+      response.status(500).json({ error: err.message });
+      return;
+    }
+    response.status(500).json({ error: "Unknown error calling GROQ provider" });
+  }
 });
 
 app.listen(port, () => {
