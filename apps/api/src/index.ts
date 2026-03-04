@@ -26,7 +26,7 @@ const corsOriginsRaw =
   process.env.CORS_ORIGINS ?? process.env.CORS_ORIGIN ?? "http://localhost:5173";
 const allowedOrigins = corsOriginsRaw
   .split(",")
-  .map((origin) => origin.trim().replace(/\/$/, ""))
+  .map((origin: string) => origin.trim().replace(/\/$/, ""))
   .filter(Boolean);
 
 if (!supabaseUrl || !supabasePublishableKey || !supabaseServiceRoleKey) {
@@ -42,7 +42,7 @@ const app = express();
 
 app.use(
   cors({
-    origin: (origin, callback) => {
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
         return;
@@ -69,7 +69,7 @@ const createClassSchema = z.object({
   description: z.string().min(10).max(2000),
   instructorName: z.string().min(2).max(120),
   location: z.string().min(2).max(120),
-  startsAt: z.string().refine((value) => !Number.isNaN(Date.parse(value)), {
+  startsAt: z.string().refine((value: string) => !Number.isNaN(Date.parse(value)), {
     message: "startsAt must be an ISO 8601 date-time string"
   }),
   capacity: z.number().int().min(1).max(1000)
@@ -376,7 +376,7 @@ app.get("/api/member/classes", async (request: Request, response: Response) => {
   response.json(responsePayload);
 });
 
-app.post("/api/member/registrations", async (request, response) => {
+app.post("/api/member/registrations", async (request: Request, response: Response) => {
   const user = await requireUser(request, response, ["member"]);
   if (!user) {
     return;
