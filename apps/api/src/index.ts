@@ -1,7 +1,6 @@
 import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
-import type { Request, Response } from "express";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
@@ -108,7 +107,7 @@ type CommunityClass = {
   created_by: string;
 };
 
-function readBearerToken(request: Request) {
+function readBearerToken(request: any) {
   const header = request.headers.authorization;
   if (!header) {
     return null;
@@ -142,8 +141,8 @@ async function fetchUserRole(userId: string): Promise<UserRole | null> {
 
 
 async function requireUser(
-  request: Request,
-  response: Response,
+  request: any,
+  response: any,
   allowedRoles?: UserRole[]
 ): Promise<AuthenticatedUser | null> {
   const token = readBearerToken(request);
@@ -194,11 +193,11 @@ async function upsertUserRole(userId: string, role: UserRole) {
   }
 }
 
-app.get("/health", (_request: Request, response: Response) => {
+app.get("/health", (_request: any, response: any) => {
   response.json({ status: "ok" });
 });
 
-app.post("/api/auth/signup", async (request: Request, response: Response) => {
+app.post("/api/auth/signup", async (request: any, response: any) => {
   const parsed = signupSchema.safeParse(request.body);
 
   if (!parsed.success) {
@@ -236,7 +235,7 @@ app.post("/api/auth/signup", async (request: Request, response: Response) => {
   });
 });
 
-app.post("/api/auth/login", async (request: Request, response: Response) => {
+app.post("/api/auth/login", async (request: any, response: any) => {
   const parsed = loginSchema.safeParse(request.body);
 
   if (!parsed.success) {
@@ -269,7 +268,7 @@ app.post("/api/auth/login", async (request: Request, response: Response) => {
   });
 });
 
-app.get("/api/auth/me", async (request: Request, response: Response) => {
+app.get("/api/auth/me", async (request: any, response: any) => {
   const user = await requireUser(request, response);
   if (!user) {
     return;
@@ -281,7 +280,7 @@ app.get("/api/auth/me", async (request: Request, response: Response) => {
   });
 });
 
-app.get("/api/admin/classes", async (request: Request, response: Response) => {
+app.get("/api/admin/classes", async (request: any, response: any) => {
   const user = await requireUser(request, response, ["admin"]);
   if (!user) {
     return;
@@ -300,7 +299,7 @@ app.get("/api/admin/classes", async (request: Request, response: Response) => {
   response.json(data ?? []);
 });
 
-app.post("/api/admin/classes", async (request: Request, response: Response) => {
+app.post("/api/admin/classes", async (request: any, response: any) => {
   const user = await requireUser(request, response, ["admin"]);
   if (!user) {
     return;
@@ -340,7 +339,7 @@ app.post("/api/admin/classes", async (request: Request, response: Response) => {
   response.status(201).json(data);
 });
 
-app.get("/api/member/classes", async (request: Request, response: Response) => {
+app.get("/api/member/classes", async (request: any, response: any) => {
   const user = await requireUser(request, response, ["member"]);
   if (!user) {
     return;
@@ -392,7 +391,7 @@ app.get("/api/member/classes", async (request: Request, response: Response) => {
   response.json(responsePayload);
 });
 
-app.post("/api/member/registrations", async (request: Request, response: Response) => {
+app.post("/api/member/registrations", async (request: any, response: any) => {
   const user = await requireUser(request, response, ["member"]);
   if (!user) {
     return;
@@ -465,7 +464,7 @@ app.post("/api/member/registrations", async (request: Request, response: Respons
   response.status(201).json({ message: "Registration successful." } satisfies AuthResponse);
 });
 
-app.post("/api/groq-query", async (request: Request, response: Response) => {
+app.post("/api/groq-query", async (request: any, response: any) => {
   const user = await requireUser(request, response, ["member"]);
   if (!user) {
     return;
